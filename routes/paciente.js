@@ -437,17 +437,36 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-  const { dni, nombre, apellido, fecha_nacimiento, edad, sexo, telefono, tipo_sangre, correo, estado_civil, id_seguro } = req.body;
+  const { id } = req.params;
+  const {dni,nombre,apellido,fecha_nacimiento,edad,sexo,telefono,tipo_sangre,correo,estado_civil,id_seguro} = req.body;
   try {
     const [result] = await pool.query(
-      'UPDATE paciente SET dni=?, nombre=?, apellido=?, fecha_nacimiento=?, edad=?, sexo=?, telefono=?, tipo_sangre=?, correo=?, estado_civil=?, id_seguro=? WHERE id_paciente=?',
-      [dni, nombre, apellido, fecha_nacimiento, edad, sexo, telefono, tipo_sangre, correo, estado_civil, id_seguro, req.params.id]
+      `UPDATE paciente SET
+        dni = ?,
+        nombre = ?,
+        apellido = ?,
+        fecha_nacimiento = ?,
+        edad = ?,
+        sexo = ?,
+        telefono = ?,
+        tipo_sangre = ?,
+        correo = ?,
+        estado_civil = ?,
+        id_seguro = ?
+      WHERE id_paciente = ?`,
+      [dni,nombre,apellido,fecha_nacimiento,edad,sexo,telefono,tipo_sangre,correo,estado_civil,id_seguro || null, id]
     );
-    res.json({ message: 'Paciente actualizado' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Paciente no encontrado' });
+    }
+    res.json({ message: 'Paciente actualizado correctamente' });
+  } 
+  catch (err) {
+    console.error('Error actualizando paciente:', err);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
+
 
 router.delete('/:id', async (req, res) => {
   try {
