@@ -2,8 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const pool = require('./db');
 
-app.use(cors());
+
 const app = express();
+app.use(cors());
 
 app.use(express.json());
 
