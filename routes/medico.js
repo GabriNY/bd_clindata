@@ -215,10 +215,21 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  const idMedico = req.params.id;
   try {
-    await pool.query('DELETE FROM medico WHERE id_medico = ?', [req.params.id]);
-    res.json({ message: 'Médico eliminado' });
+    // 1. Eliminar relaciones en medico_especialidad
+    await pool.query('DELETE FROM medico_especialidad WHERE id_medico = ?', [idMedico]);
+
+    // 2. Eliminar el médico
+    const [result] = await pool.query('DELETE FROM medico WHERE id_medico = ?', [idMedico]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Médico no encontrado' });
+    }
+
+    res.json({ message: 'Médico y sus relaciones eliminados correctamente' });
   } catch (err) {
+    console.error('Error eliminando médico:', err);
     res.status(500).json({ error: err.message });
   }
 });
