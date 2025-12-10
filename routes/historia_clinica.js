@@ -153,12 +153,35 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/historia/:id', async (req, res) => {
+  const { id } = req.params;
+  const conn = await pool.getConnection();
   try {
-    await pool.query('DELETE FROM historia_clinica WHERE id_historia = ?', [req.params.id]);
-    res.json({ message: 'Historia clínica eliminada' });
+    await conn.beginTransaction();
+
+    // 1. Eliminar tratamientos vinculados a diagnósticos de la historia
+    await conn.query(`
+      DELETE t FROM tratamiento t
+      INNER JOIN diagnostico d ON t.id_diagnostico = d.id_diagnostico
+      WHERE d.id_historia = ?`, [id]);
+
+    // 2. Eliminar diagnósticos de la historia
+    await conn.query(`DELETE FROM diagnostico WHERE id_historia = ?`, [id]);
+
+    // 3. Eliminar antecedentes de la historia
+    await conn.query(`DELETE FROM antecedente WHERE id_historia = ?`, [id]);
+
+    // 4. Eliminar la historia clínica
+    await conn.query(`DELETE FROM historia_clinica WHERE id_historia = ?`, [id]);
+
+    await conn.commit();
+    res.json({ message: 'Historia clínica y registros asociados eliminados' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    await conn.rollback();
+    console.error('Error al eliminar historia clínica:', err);
+    res.status(500).json({ error: 'Error interno al eliminar historia clínica' });
+  } finally {
+    conn.release();
   }
 });
 
