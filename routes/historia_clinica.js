@@ -2,111 +2,62 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-// Reporte
-router.get('/reporte', async (req, res) => {
-  const { paciente, gravedad, desde, hasta } = req.query;
-
-  let sql = `
-    SELECT h.id_historia, h.fecha_creacion, h.observaciones,
-           CONCAT(p.nombre, ' ', p.apellido) AS paciente,
-           d.id_diagnostico, d.descripcion AS diagnostico, d.gravedad, d.fecha, d.hora,
-           CONCAT(m.nombre, ' ', m.apellido) AS medico
-    FROM historia_clinica h
-    JOIN paciente p ON h.id_paciente = p.id_paciente
-    LEFT JOIN diagnostico d ON h.id_historia = d.id_historia
-    LEFT JOIN medico m ON d.id_medico = m.id_medico
-    WHERE 1=1
-  `;
-  const params = [];
-
-  if (paciente) {
-    sql += ' AND (p.nombre LIKE ? OR p.apellido LIKE ?)';
-    params.push(`${paciente}%`, `${paciente}%`);
-  }
-  if (gravedad) {
-    sql += ' AND d.gravedad = ?';
-    params.push(gravedad);
-  }
-  if (desde && hasta) {
-    sql += ' AND h.fecha_creacion BETWEEN ? AND ?';
-    params.push(desde, hasta);
-  }
-
-  sql += ' ORDER BY h.fecha_creacion, d.fecha, d.hora';
-
+router.get('/historia/reporte/:id', async (req, res) => {
+  const { id } = req.params; // id_historia
   try {
-    const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    const [historia] = await pool.query(
+      `SELECT h.id_historia, h.observaciones, h.fecha_creacion,
+              p.id_paciente, p.nombre, p.apellido, p.dni
+       FROM historia_clinica h
+       INNER JOIN paciente p ON h.id_paciente = p.id_paciente
+       WHERE h.id_historia = ?`,
+      [id]
+    );
+
+    if (historia.length === 0) {
+      return res.status(404).json({ error: 'Historia clínica no encontrada' });
+    }
+
+    const [antecedentes] = await pool.query(
+      `SELECT id_antecedente, descripcion, alergia, cirugia, enfermedad_cronica, fecha_diagnostico
+       FROM antecedente
+       WHERE id_historia = ?`,
+      [id]
+    );
+
+    const [diagnosticos] = await pool.query(
+      `SELECT d.id_diagnostico, d.descripcion, d.fecha, d.hora, d.gravedad,
+              m.id_medico, m.nombre AS nombre_medico, m.apellido AS apellido_medico
+       FROM diagnostico d
+       INNER JOIN medico m ON d.id_medico = m.id_medico
+       WHERE d.id_historia = ?`,
+      [id]
+    );
+
+    const [tratamientos] = await pool.query(
+      `SELECT t.id_tratamiento, t.id_diagnostico, t.duracion, t.dosis, t.frecuencia,
+              t.via_administracion, t.observaciones
+       FROM tratamiento t
+       INNER JOIN diagnostico d ON t.id_diagnostico = d.id_diagnostico
+       WHERE d.id_historia = ?`,
+      [id]
+    );
+
+    const respuesta = {
+      historia: historia[0],
+      antecedentes,
+      diagnosticos: diagnosticos.map(d => ({
+        ...d,
+        tratamientos: tratamientos.filter(t => t.id_diagnostico === d.id_diagnostico)
+      }))
+    };
+
+    res.json(respuesta);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error en reporte historia clínica:', err);
+    res.status(500).json({ error: 'Error interno al generar reporte' });
   }
 });
-
-// Exportar reporte
-const ExcelJS = require('exceljs');
-router.get('/reporte/exportar', async (req, res) => {
-  const { paciente, gravedad, desde, hasta } = req.query;
-
-  let sql = `
-    SELECT h.id_historia, h.fecha_creacion, h.observaciones,
-           CONCAT(p.nombre, ' ', p.apellido) AS paciente,
-           d.id_diagnostico, d.descripcion AS diagnostico, d.gravedad, d.fecha, d.hora,
-           CONCAT(m.nombre, ' ', m.apellido) AS medico
-    FROM historia_clinica h
-    JOIN paciente p ON h.id_paciente = p.id_paciente
-    LEFT JOIN diagnostico d ON h.id_historia = d.id_historia
-    LEFT JOIN medico m ON d.id_medico = m.id_medico
-    WHERE 1=1
-  `;
-  const params = [];
-
-  if (paciente) {
-    sql += ' AND (p.nombre LIKE ? OR p.apellido LIKE ?)';
-    params.push(`${paciente}%`, `${paciente}%`);
-  }
-  if (gravedad) {
-    sql += ' AND d.gravedad = ?';
-    params.push(gravedad);
-  }
-  if (desde && hasta) {
-    sql += ' AND h.fecha_creacion BETWEEN ? AND ?';
-    params.push(desde, hasta);
-  }
-
-  sql += ' ORDER BY h.fecha_creacion, d.fecha, d.hora';
-
-  try {
-    const [rows] = await pool.query(sql, params);
-
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Reporte Historias');
-
-    ws.columns = [
-      { header: 'ID Historia', key: 'id_historia', width: 12 },
-      { header: 'Fecha Creación', key: 'fecha_creacion', width: 20 },
-      { header: 'Observaciones', key: 'observaciones', width: 30 },
-      { header: 'Paciente', key: 'paciente', width: 24 },
-      { header: 'ID Diagnóstico', key: 'id_diagnostico', width: 12 },
-      { header: 'Diagnóstico', key: 'diagnostico', width: 30 },
-      { header: 'Gravedad', key: 'gravedad', width: 14 },
-      { header: 'Fecha Diagnóstico', key: 'fecha', width: 20 },
-      { header: 'Hora Diagnóstico', key: 'hora', width: 14 },
-      { header: 'Médico', key: 'medico', width: 24 }
-    ];
-    ws.getRow(1).font = { bold: true };
-
-    rows.forEach(r => ws.addRow(r));
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=reporte_historias.xlsx');
-
-    await wb.xlsx.write(res);
-    res.end();
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 
 router.get('/', async (req, res) => {
   try {
