@@ -144,17 +144,61 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { fecha_hora, estado, motivo, asistencia, duracion, id_consultorio, id_paciente, id_medico } = req.body;
+  const {
+    fecha_hora,
+    estado,
+    motivo,
+    asistencia,
+    duracion,
+    id_consultorio,
+    id_paciente,
+    id_medico
+  } = req.body;
+
+  // Validación mínima
+  if (
+    !fecha_hora || !estado || !motivo || !asistencia || !duracion ||
+    !id_consultorio || !id_paciente || !id_medico
+  ) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios' });
+  }
+
+  // Logging para depurar
+  console.log('Datos recibidos para crear cita:', {
+    fecha_hora,
+    estado,
+    motivo,
+    asistencia,
+    duracion,
+    id_consultorio,
+    id_paciente,
+    id_medico
+  });
+
   try {
     const [result] = await pool.query(
-      'INSERT INTO cita (fecha_hora, estado, motivo, asistencia, duracion, id_consultorio, id_paciente, id_medico) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [fecha_hora, estado, motivo, asistencia, duracion, id_consultorio, id_paciente, id_medico]
+      `INSERT INTO cita (
+        fecha_hora, estado, motivo, asistencia, duracion,
+        id_consultorio, id_paciente, id_medico
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        fecha_hora,
+        estado,
+        motivo,
+        asistencia,
+        duracion,
+        id_consultorio,
+        id_paciente,
+        id_medico
+      ]
     );
     res.json({ id: result.insertId, message: 'Cita creada' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error al crear cita:', err);
+    res.status(500).json({ error: 'Error interno al crear cita' });
   }
 });
+
 
 router.put('/:id', async (req, res) => {
   const { fecha_hora, estado, motivo, asistencia, duracion, id_consultorio, id_paciente, id_medico } = req.body;
