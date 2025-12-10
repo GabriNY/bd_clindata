@@ -202,17 +202,38 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-  const { dni, nombre, apellido, fecha_nacimiento, edad, sexo, telefono, tipo_sangre, correo, estado_civil } = req.body;
+  const {
+    dni,
+    nombre,
+    apellido,
+    fecha_nacimiento,
+    edad,
+    sexo,
+    telefono,
+    tipo_sangre,
+    correo,
+    estado_civil
+  } = req.body;
+
   try {
-    await pool.query(
-      'UPDATE medico SET dni=?, nombre=?, apellido=?, fecha_nacimiento=?, edad=?, sexo=?, telefono=?, tipo_sangre=?, correo=?, estado_civil=? WHERE id_medico=?',
+    const [result] = await pool.query(
+      `UPDATE medico 
+       SET dni=?, nombre=?, apellido=?, fecha_nacimiento=?, edad=?, sexo=?, telefono=?, tipo_sangre=?, correo=?, estado_civil=? 
+       WHERE id_medico=?`,
       [dni, nombre, apellido, fecha_nacimiento, edad, sexo, telefono, tipo_sangre, correo, estado_civil, req.params.id]
     );
-    res.json({ message: 'Médico actualizado' });
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Médico no encontrado' });
+    }
+
+    res.json({ message: 'Médico actualizado correctamente' });
   } catch (err) {
+    console.error('Error en actualización de médico:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 router.delete('/:id', async (req, res) => {
   const idMedico = req.params.id;
