@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-router.get('/historia/reporte/:id', async (req, res) => {
+router.get('/reporte/:id', async (req, res) => {
   const { id } = req.params; // id_historia
   try {
     const [historia] = await pool.query(
