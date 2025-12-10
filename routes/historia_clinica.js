@@ -61,9 +61,15 @@ router.get('/reporte/:id', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM historia_clinica');
+    const [rows] = await pool.query(
+      `SELECT h.id_historia, h.observaciones, h.fecha_creacion,
+              p.id_paciente, p.nombre, p.apellido, p.dni, p.edad, p.sexo, p.telefono, p.correo
+       FROM historia_clinica h
+       INNER JOIN paciente p ON h.id_paciente = p.id_paciente`
+    );
     res.json(rows);
   } catch (err) {
+    console.error('Error al listar historias clínicas:', err);
     res.status(500).json({ error: err.message });
   }
 });
