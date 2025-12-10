@@ -147,17 +147,22 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { descripcion, fecha, id_historia } = req.body;
+  const { descripcion, fecha, hora, gravedad, id_medico, id_historia } = req.body;
+
   try {
     const [result] = await pool.query(
-      'INSERT INTO diagnostico (descripcion, fecha, id_historia) VALUES (?, ?, ?)',
-      [descripcion, fecha, id_historia]
+      `INSERT INTO diagnostico (descripcion, fecha, hora, gravedad, id_medico, id_historia)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [descripcion, fecha, hora, gravedad, id_medico, id_historia]
     );
+
     res.json({ id: result.insertId, message: 'Diagnóstico creado' });
   } catch (err) {
+    console.error('Error al crear diagnóstico:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 router.put('/:id', async (req, res) => {
   const { descripcion, fecha, id_historia } = req.body;
